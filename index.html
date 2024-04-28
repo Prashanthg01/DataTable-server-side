@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DataUSA API Example</title>
+    <!-- DataTables CSS -->
+    <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/1.11.5/css/jquery.dataTables.css">
+    <link rel="stylesheet" href="//code.jquery.com/ui/1.13.2/themes/base/jquery-ui.css">
+</head>
+<style>
+    tbody td, thead th {
+        max-width: 200px;
+    }
+    select {
+        width: 100%;
+    }
+</style>
+<body>
+    <label for="start-date">Start Date:</label>
+    <input type="date" id="start-date">
+
+    <label for="end-date">End Date:</label>
+    <input type="date" id="end-date">
+
+    <label for="start-time">Start Time:</label>
+    <input type="time" id="start-time">
+
+    <label for="end-time">End Time:</label>
+    <input type="time" id="end-time">
+
+    <table id="data-table" class="display">
+        <thead>
+            <tr></tr> <!-- Dynamic columns will be added here -->
+        </thead>
+        <tbody></tbody>
+    </table>
+
+    <!-- jQuery -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <!-- DataTables JS -->
+    <script src="https://cdn.datatables.net/1.11.5/js/jquery.dataTables.js"></script>
+    <script>
+        $(document).ready(function () {
+            // Fetch data from API
+            $.ajax({
+                url: 'http://127.0.0.1:5000/api/pincode',
+                method: 'GET',
+                success: function (response) {
+                    // Populate DataTable with API data
+                    var tableData = response.data.map(function (item) {
+                        return Object.values(item);
+                    });
+
+                    var columns = Object.keys(response.data[0]).map(function (key) {
+                        return { title: key };
+                    });
+
+                    var table = $('#data-table').DataTable({
+                        data: tableData,
+                        columns: columns,
+                        "pageLength": 5 // Set number of rows per page
+                    });
+
+                    // Add a select dropdown for each column for filtering
+                    $('#data-table thead tr:first').append(columns.map(function (column) {
+                        return '<th>' + column.title + '</th>';
+                    }));
+
+                    table.columns().every(function () {
+                        var column = this;
+                        var select = $('<select><option value=""></option></select>')
+                            .appendTo($(column.header()).empty())
+                            .on('change', function () {
+                                var val = $.fn.dataTable.util.escapeRegex(
+                                    $(this).val()
+                                );
+                                column
+                                    .search(val ? '^' + val + '$' : '', true, false)
+                                    .draw();
+                            });
+
+                        column.data().unique().sort().each(function (d, j) {
+                            select.append('<option value="' + d + '">' + d + '</option>');
+                        });
+                    });
+                    // Log start and end dates
+                    function getDates(startDate, endDate) {
+                        var dates = [];
+                        var currentDate = new Date(startDate);
+                        var end = new Date(endDate);
+                        while (currentDate <= end) {
+                            dates.push(currentDate.toISOString().slice(0, 10));
+                            currentDate.setDate(currentDate.getDate() + 1);
+                        }
+                        return dates;
+                    }
+
+                    $('#start-date, #end-date').on('change', function () {
+                        $('#data-table thead tr:first').empty();
+                        var startDate = $('#start-date').val();
+                        var endDate = $('#end-date').val();
+                        var datesList = getDates(startDate, endDate);
+
+                        var filteredColumns = columns.filter(function (column) {
+                            if (column.title.includes('delivery_date')) {
+                                var datePart = column.title.match(/\d{4}-\d{2}-\d{2}/)[0];
+                                return datesList.includes(datePart);
+                            }
+                            return true; // Keep non-delivery_date columns
+                        });
+
+                        $('#data-table thead tr:first').append(filteredColumns.map(function (filteredColumns) {
+                            return '<th>' + filteredColumns.title + '</th>';
+                        }));
+
+                        table.columns().every(function () {
+                            var column = this;
+                            if (column.header().ariaLabel.includes('delivery_date')) {
+                                var datePart = column.header().ariaLabel.match(/\d{4}-\d{2}-\d{2}/)[0];
+                                if (datesList.includes(datePart)) {
+                                    column.visible(true);  // Show the column
+                                    $(column.header()).show();
+                                } else {
+                                    column.visible(false);  // Hide the column
+                                    $(column.header()).hide();
+                                }
+                            }
+                        });
+                    });
+
+
+                },
+                error: function (error) {
+                    console.error('Error fetching data:', error);
+                }
+            });
+            // Log start and end dates
+            $('#start-date, #end-date').on('change', function () {
+                var startDate = $('#start-date').val();
+                var endDate = $('#end-date').val();
+                if (startDate && endDate) {
+                    console.log('Start Date:', startDate, 'End Date:', endDate);
+                }
+            });
+            $('#start-time, #end-time').on('change', function () {
+                var startTime = $('#start-time').val();
+                var endTime = $('#end-time').val();
+                if (startTime && endTime) {
+                    console.log('Start Time:', startTime, 'End Time:', endTime);
+                }
+            });
+
+        });
+    </script>
+</body>
+
+</html>
