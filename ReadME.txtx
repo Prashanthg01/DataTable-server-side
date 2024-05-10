@@ -1,0 +1,18 @@
+Step 1: Clone the Repo
+https://github.com/Prashanthg01/DataTable-server-side.git
+
+Step 2: Create python environment
+python -m venv env
+
+Step 3: Activate environment
+env/Scripts/Activate
+
+Step 4: install Requirements
+pip install requirements.txt
+
+Step 5: Run Flask
+python main.py
+
+Step 6: Go to locatlhost:5000/index view.
+
+End
