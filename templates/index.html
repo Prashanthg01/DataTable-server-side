@@ -1,0 +1,612 @@
+{% extends 'base.html' %}
+
+{% block custom_css %}
+<link rel="stylesheet" type="text/css" href="{{ url_for('static', filename = 'css/bootstrap.css') }}">
+<link rel="stylesheet" type="text/css" href="{{ url_for('static', filename = 'css/dataTables.bootstrap4.min.css') }}">
+<link rel="stylesheet" type="text/css" href="{{ url_for('static', filename = 'css/jquery-ui.css') }}">
+<style>
+    tbody td,
+    thead th {
+        max-width: 200px;
+        overflow: hidden;
+        padding: 13px !important;
+    }
+
+    select {
+        width: 100%;
+    }
+
+    #data-table thead tr:last-child {
+        display: none;
+        background-color: #e59d55 !important;
+        color: #1e406d !important;
+    }
+
+    #data-table thead tr:last-child th {
+        padding: 5px !important;
+    }
+
+    thead {
+        position: sticky;
+        top: 85px;
+        z-index: 2;
+    }
+
+    th {
+        min-width: 100px !important;
+    }
+
+    td,
+    .sorting_1 {
+        background-color: #fff !important;
+        color: #000 !important;
+    }
+
+    .table-responsive {
+        overflow-x: visible !important;
+    }
+
+    #data-table_wrapper {
+        background-color: #fff !important;
+    }
+
+    #wrapper #content-wrapper {
+        overflow-x: visible !important;
+    }
+
+    #content {
+        background-color: #fff;
+    }
+
+    .container-fluid {
+        padding: .01rem !important;
+    }
+
+    .filter_data {
+        display: flex;
+        position: fixed;
+        z-index: 3;
+        top: 0px;
+        padding: 10px;
+        background: #1e406d;
+        color: #fff;
+        gap: 10px;
+        align-items: center;
+        width: -webkit-fill-available;
+        width: 100% !important;
+        justify-content: space-between
+    }
+
+    #loadingOverlay {
+        z-index: 20;
+        position: relative;
+    }
+
+    .spinner-border {
+        color: #1e406d;
+        background: #fff;
+        position: fixed;
+        top: 137px;
+    }
+
+    .red-background {
+        background-color: #f1b0b7 !important;
+    }
+
+    .green-background {
+        background-color: #b1dfbb !important;
+    }
+
+
+    button,
+    input {
+        overflow: visible;
+        border-radius: 2px;
+        padding: 0px 5px;
+        background: #fff;
+        border: none;
+        color: gray;
+    }
+
+    #toggleButton,
+    #downloadButton {
+        background-color: #f8d352 !important;
+        color: #1e406d !important;
+        padding: 2px 7px;
+    }
+
+    label {
+        margin: 0 !important;
+        font-size: 15px;
+    }
+
+    tbody tr td {
+        font-size: 16px !important;
+    }
+
+    .table-responsive {
+        margin-top: 10px;
+    }
+
+    .product_heading {
+        padding: 0;
+        font-size: 25px;
+        font-weight: 600;
+        margin-top: 70px;
+        z-index: 2;
+        position: relative;
+    }
+
+    #data-table_wrapper .row:first-child {
+        position: sticky;
+        top: 45px;
+        z-index: 1;
+        background: #fff;
+        padding: 6px 2px;
+    }
+
+    .fixed_blank_card {
+        background-color: #fff !important;
+        padding-bottom: 60px !important;
+        position: fixed;
+        top: 35px;
+        width: 100%;
+        z-index: 1;
+        height: 2px;
+    }
+</style>
+<script src="{{ url_for('static', filename = 'js/jquery.min.js') }}"></script>
+{% endblock %}
+
+{% block content %}
+<div class="filter_data">
+    <div class="d-flex" style="gap:30px">
+        {% if 'datepicker' in options_list %}
+        <div>
+            <label for="start-date">Start Date:</label>
+            <input type="date" id="start-date">
+        </div>
+
+        <div>
+            <label for="end-date">End Date:</label>
+            <input type="date" id="end-date">
+        </div>
+        {% endif %}
+        {% if "timepicker" in options_list %}
+        <div>
+            <label for="start-time">Start Time:</label>
+            <input type="time" id="start-time">
+        </div>
+
+        <div>
+            <label for="end-time">End Time:</label>
+            <input type="time" id="end-time">
+        </div>
+        {% endif %}
+    </div>
+    <div class="d-flex" style="gap: 30px;">
+        <button id="toggleButton" onclick="toggleLastHeaderRow()">Filter columns</button>
+        <button id="downloadButton">Export to Excel</button>
+    </div>
+</div>
+<div class="fixed_blank_card"></div> <!-- Don't delete this div -->
+<div>
+    <h1 class="h3 mb-0 product_heading text-capitalize" id="main-heading"></h1>
+</div>
+<div>
+    <div class="row"></div>
+    <div class="row"></div>
+    <div class="row"></div>
+</div>
+
+<!--  Loading Animation  -->
+<div id="loadingOverlay" style="display: none;text-align: center;">
+    <div class="spinner-border text-primary" role="status">
+        <span class="sr-only">Loading...</span>
+    </div>
+</div>
+<!--  Loading Animation End -->
+
+<div class="container-fluid">
+    <div class="container-fluid form-main p-1">
+        <div>
+            <div>
+                <div class="table-responsive">
+                    <table id="data-table" class="display" style="width:100%">
+                        <thead>
+                            <!-- Dynamic columns will be added here -->
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block custom_js %}
+
+<!-- jQuery -->
+<script src="{{ url_for('static', filename = 'js/jquery-3.4.1.min.js') }}"></script>
+<script src="{{ url_for('static', filename = 'js/jquery-ui.js') }}"></script>
+<!-- DataTables JS -->
+<script src="{{ url_for('static', filename = 'js/jquery.dataTables.min.js') }}"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.17.4/xlsx.full.min.js"></script>
+<script src="{{ url_for('static', filename = 'js/dataTables.bootstrap4.min.js') }}"></script>
+<script>
+    // Function to toggle visibility of last tr in thead
+    function toggleLastHeaderRow() {
+        var lastHeaderRow = $('#data-table thead tr:last');
+        lastHeaderRow.toggle();
+    }
+</script>
+<script>
+    $(document).ready(function () {
+        var startDate = $('#start-date');
+        var endDate = $('#end-date');
+        var startTime = $('#start-time');
+        var endTime = $('#end-time');
+        var table; // Define table outside the success callback
+        var mainrowsData;
+        var maincolumns;
+        var firstRowData;
+        fetchData()
+        $.fn.dataTable.ext.errMode = 'none';
+        // DRR summary
+        function processData(data) {
+            const dateCols = Object.keys(data.data[0]).filter(col => col.startsWith("delivery_date"));
+            const numCrawls = dateCols.length;
+
+            function calculateSummary(row) {
+                let unavailableCounts = 0;
+                let delayCounts = 0;
+
+                dateCols.forEach(col => {
+                    if (row[col] === 'Currently Unavailable') {
+                        unavailableCounts++;
+                    } else if (parseInt(row[col].split(" ")[0]) > 4) {
+                        delayCounts++;
+                    }
+                });
+
+                const loss = (((unavailableCounts + (delayCounts / 2)) / numCrawls) * 100).toFixed(2) + " %";
+                return [numCrawls, unavailableCounts, delayCounts, loss];
+            }
+
+            data.data.forEach(row => {
+                const CountsInfo = calculateSummary(row);
+                row['No of Crawls'] = CountsInfo[0];
+                row['No of Unavailables'] = CountsInfo[1];
+                row['No of delay Dates'] = CountsInfo[2];
+                row['loss'] = CountsInfo[3];
+            });
+
+            // Reorder columns
+            const reorderedData = data.data.map(row => ({
+                Pincode: row.Pincode,
+                Region: row.Region,
+                Category: row.Category,
+                SubCategory: row.SubCategory,
+                ProductID: row.ProductID,
+                Product_name: row.Product_name,
+                RetailerName: row.RetailerName,
+                Website: row.Website,
+                'No of Crawls': row['No of Crawls'],
+                'No of Unavailables': row['No of Unavailables'],
+                'No of delay Dates': row['No of delay Dates'],
+                loss: row.loss
+            }));
+
+            return reorderedData;
+        }
+        // Formate Data
+        function formatData(cols, rows) {
+            var output = {
+                "data": []
+            }
+
+            rows.forEach(function (row) {
+                var obj = {};
+                cols.forEach(function (col, index) {
+                    obj[col] = row[index];
+                });
+                output["data"].push(obj);
+            });
+
+            return output;
+        }
+        // Convert data to Array:
+        function convertObjectToArray(data) {
+            var cols = Object.keys(data[0]);
+            var rows = data.map(function (item) {
+                return Object.values(item);
+            });
+
+            return { cols, rows };
+        }
+        // Update date range in datepicker
+        function updateDateRange(Tablecolumns) {
+            var minDate = Tablecolumns.find(column => column.includes("price") || column.includes("delivery_date") || column.includes("rank")).match(/\d{4}-\d{2}-\d{2}/)[0];
+            var maxDate = Tablecolumns.reduce((acc, column) => (column.includes("price") || column.includes("delivery_date") || column.includes("rank")) ? column : acc, "").match(/\d{4}-\d{2}-\d{2}/)[0];
+            $('#start-date').attr('min', minDate).attr('max', maxDate);
+            $('#end-date').attr('min', minDate).attr('max', maxDate);
+        }
+        // get list of date b/w dates
+        function getDates(startDate, endDate) {
+            var dates = [];
+            var currentDate = new Date(startDate);
+            var end = new Date(endDate);
+            while (currentDate <= end) {
+                dates.push(currentDate.toISOString().slice(0, 10));
+                currentDate.setDate(currentDate.getDate() + 1);
+            }
+            return dates;
+        }
+        // get list of times b/w times
+        function getTimes(startTime, endTime) {
+            var times = [];
+            var startHour = parseInt(startTime.split(":")[0]);
+            var endHour = parseInt(endTime.split(":")[0]);
+            for (var i = startHour; i <= endHour; i++) {
+                var timeString = (i < 10 ? "0" : "") + i + ":00";
+                times.push(timeString);
+            }
+            return times;
+        }
+        // filter columns based on dates
+        function getfilterdColumns(datesList, columns) {
+            var filtered_cols = columns.filter(function (col) {
+                if (col.includes("price") || col.includes("delivery_date") || col.includes("rank")) {
+                    return datesList.some(function (date) {
+                        return col.includes(date);
+                    });
+                }
+                return true;
+            });
+            return filtered_cols;
+        }
+        // Get Defaul dates from data
+        function getDefaultdates(columns) {
+            var lastItem = columns[columns.length - 1];
+            var lastseconditem = columns[columns.length - 3]
+
+            if (lastItem.includes("price") || lastItem.includes("delivery_date") || lastItem.includes("rank")) {
+                lastItem = lastItem.match(/\d{4}-\d{2}-\d{2}/)[0]
+            } else {
+                lastItem = columns.find(item => item.includes("price")).match(/\d{4}-\d{2}-\d{2}/)[0];
+            }
+            if (lastseconditem.includes("price") || lastseconditem.includes("delivery_date") || lastseconditem.includes("rank")) {
+                var lastseconditem = lastseconditem.match(/\d{4}-\d{2}-\d{2}/)[0];
+            } else {
+                lastseconditem = lastItem
+            }
+
+            return [lastseconditem, lastItem]
+        }
+        // create DropDowns
+        function createDropdownFilters(table, targetColumns) {
+            var dropdownRow = $('#data-table thead').append('<tr></tr>').find('tr:last');
+            var columns = table.columns().header().toArray().map(function (th) {
+                return $(th).text();
+            });
+
+            table.columns().every(function () {
+                var column = this;
+                var columnName = columns[column.index()];
+
+                if (targetColumns.includes(columnName)) {
+                    var select = $('<select><option value=""></option></select>')
+                        .appendTo($('<th></th>').appendTo(dropdownRow))
+                        .on('change', function () {
+                            var val = $.fn.dataTable.util.escapeRegex(
+                                $(this).val()
+                            );
+                            column
+                                .search(val ? '^' + val + '$' : '', true, false)
+                                .draw();
+                        });
+
+                    column.data().unique().sort().each(function (d, j) {
+                        select.append('<option value="' + d + '">' + d + '</option>');
+                    });
+                } else {
+                    // Append an empty th for columns not in the targetColumns list
+                    $('<th></th>').appendTo(dropdownRow);
+                }
+            });
+        }
+        // Filter Table Data 
+        function filterTabledata() {
+            var startdate = $('#start-date').val();
+            var enddate = $('#end-date').val();
+            var starttime = $('#start-time').val();
+            var endtime = $('#end-time').val();
+
+            if (!(startdate)) {
+                [startdate, enddate] = getDefaultdates(maincolumns)
+            }
+
+            var datesList = getDates(startdate, enddate);
+            filtered_cols = getfilterdColumns(datesList, maincolumns)
+            if (starttime) {
+                var timesList = getTimes(starttime, endtime);
+                filtered_cols = getfilterdColumns(timesList, filtered_cols)
+            }
+
+            filteredData = mainrowsData.map(function (row) {
+                return row.filter(function (value, index) {
+                    var columnHeader = maincolumns[index];
+                    return filtered_cols.includes(columnHeader);
+                });
+            });
+            columns = maincolumns.filter(function (header) {
+                return filtered_cols.includes(header);
+            });
+
+            return [filteredData, columns]
+        }
+
+        // Build Table
+        function buildTable() {
+            if ($.fn.DataTable.isDataTable('#data-table')) {
+                table.destroy();
+                $('#data-table').DataTable().destroy();
+                $('#data-table').empty();
+            }
+            {% if view_name != "all_reviews" %}
+            var [filteredData, columns] = filterTabledata()
+            {% else %}
+            filteredData = mainrowsData
+            columns = maincolumns
+            {% endif %}
+            
+            {% if view_name == "drr_summary" %}
+            var mainData = formatData(columns, filteredData);
+            filteredData = processData(mainData);
+            var objectData = convertObjectToArray(filteredData);
+            filteredData = objectData.rows
+            columns = objectData.cols
+            {% endif %}
+        
+            var filterdColumns = columns.map(function (title, index) {
+                return {
+                    title: title,
+                    sTitle: title
+                };
+            });
+            table = $('#data-table').DataTable({
+                data: filteredData,
+                columns: filterdColumns,
+                "pageLength": 500,
+                {% if view_name != "drr_summary" %}
+                "createdRow": function (row, data, dataIndex) {
+                    columnNames = Object.keys(firstRowData);
+                    for (var i = 1; i < columnNames.length; i++) {
+                        var currentColumnName = columnNames[i];
+                        var previousColumnName = columnNames[i - 1];
+                        if (currentColumnName.startsWith("price") && previousColumnName.startsWith("price")) {
+                            var currentColumnIndex = columnNames.indexOf(currentColumnName);
+                            var previousColumnIndex = columnNames.indexOf(previousColumnName);
+                            var currentValue = data[currentColumnIndex];
+                            var previousValue = data[previousColumnIndex];
+                            if (currentValue < previousValue) {
+                                $(row).find('td:eq(' + currentColumnIndex + ')').addClass('red-background');
+                            } else if (currentValue > previousValue) {
+                                $(row).find('td:eq(' + currentColumnIndex + ')').addClass('green-background');
+                            }
+                        } else if (currentColumnName.startsWith("delivery_date") && previousColumnName.startsWith("delivery_date")) {
+                            var currentColumnIndex = columnNames.indexOf(currentColumnName);
+                            var previousColumnIndex = columnNames.indexOf(previousColumnName);
+                            if (data[currentColumnIndex]) {
+                                var currentValue = data[currentColumnIndex].replace(' days', '');
+                            } else {
+                                var currentValue = 0;
+                            }
+                            if (data[previousColumnIndex]) {
+                                previousValue = data[previousColumnIndex].replace(' days', '');
+                            } else {
+                                previousValue = 0;
+                            }
+
+                            if ((currentValue != 'Currently Unavailable') && (previousValue != 'Currently Unavailable')) {
+
+                                if (previousValue < currentValue) {
+                                    $(row).find('td:eq(' + currentColumnIndex + ')').addClass('red-background');
+                                } else if (previousValue > currentValue) {
+                                    $(row).find('td:eq(' + currentColumnIndex + ')').addClass('green-background');
+                                }
+                            } else if ((previousValue >= 0) && (currentValue == 'Currently Unavailable')) {
+                                $(row).find('td:eq(' + currentColumnIndex + ')').addClass('red-background');
+                            } else if ((currentValue >= 0) && (previousValue == 'Currently Unavailable')) {
+                                $(row).find('td:eq(' + currentColumnIndex + ')').addClass('green-background');
+                            }
+                        }
+                    }
+                }
+                {% endif %}
+            });
+            createDropdownFilters(table, columns);
+        }
+        // Function to fetch data based on selected dates
+        function fetchData() {
+            $('#loadingOverlay').show();
+            if ($.fn.DataTable.isDataTable('#data-table')) {
+                table.destroy();
+                $('#data-table').DataTable().destroy();
+                $('#data-table').empty();
+            }
+            $.ajax({
+                url: "/json_data/{{ view_name }}",
+                method: 'POST', // Use POST method
+                success: function (response) {
+                    // Populate DataTable with API data
+                    var tableData = response.data.map(function (item) {
+                        return Object.values(item);
+                    });
+                    firstRowData = response.data[0]
+                    // Get column names from the first item of the response data
+                    var columns = Object.keys(response.data[0]).map(function (key) {
+                        return {
+                            title: key
+                        };
+                    });
+                    // store column names in variable
+                    var Tablecolumns = columns.map(function (item) {
+                        return item.title;
+                    });
+                    {% if view_name != 'all_reviews' %}
+                    updateDateRange(Tablecolumns)
+                    {% endif %}
+                    maincolumns = Tablecolumns
+                    mainrowsData = tableData
+
+                    var lastDate = Tablecolumns[Tablecolumns.length - 1];
+                    {% if view_name != 'all_reviews' %}
+                    if (lastDate.includes("price") || lastDate.includes("delivery_date") || lastDate.includes("rank")) {
+                        lastDate = lastDate.match(/\d{4}-\d{2}-\d{2}/)[0]
+                    } else {
+                        lastDate = Tablecolumns.find(item => item.includes("price")).match(/\d{4}-\d{2}-\d{2}/)[0];
+                    }
+                    {% endif %}
+                    document.getElementById('main-heading').textContent = "{% if view_name == 'all_reviews' %} Reviews Across Websites {% else %} {{ heading }} {% endif %} " + lastDate;
+                    buildTable()
+
+                },
+                error: function (xhr, status, error) {
+                    console.error('Error fetching data:', error);
+                    console.log(xhr.responseText);
+                },
+                complete: function () {
+                    $('#loadingOverlay').hide();
+                }
+            });
+        }
+
+        startDate.add(endDate).on('change', function () {
+            if (startDate.val() && endDate.val()) {
+                buildTable();
+            }
+        });
+
+        startTime.add(endTime).on('change', function () {
+            if (startTime.val() && endTime.val()) {
+                buildTable();
+            }
+        });
+
+        $('#downloadButton').on('click', function () {
+            var exportData = table.rows({ search: 'applied' }).data().toArray();
+            var exportDatacols = table.columns().header().toArray().map(function (th) {
+                return $(th).text();
+            });
+            exportData.unshift(exportDatacols);
+
+            var workbook = XLSX.utils.book_new();
+            var sheet = XLSX.utils.aoa_to_sheet(exportData);
+            XLSX.utils.book_append_sheet(workbook, sheet, "Data");
+            XLSX.writeFile(workbook, `{{ view_name }}.xlsx`);
+        });
+    });
+</script>
+{% endblock %}
